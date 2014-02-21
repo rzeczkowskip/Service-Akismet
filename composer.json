@@ -1,0 +1,26 @@
+{
+    "name": "rzekanet/service-akismet",
+    "description": "Small library to access Akismet API",
+    "homepage": "https://github.com/rzekanet/Service-Akismet",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Piotr Rzeczkowski",
+            "email": "piotr@rzeka.net"
+        },
+        {
+            "name": "Jonathan Kim",
+            "email": "jkimbo@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.0"
+    },
+    "suggest": {
+        "ext_curl": "*"
+    },
+    "autoload": {
+        "psr-0": { "Riv\\Service\\Akismet\\": "" }
+    },
+    "target-dir": "Riv/Service/Akismet"
+}
