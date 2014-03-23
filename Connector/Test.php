@@ -58,6 +58,16 @@ class Test implements ConnectorInterface
     private $spamAuthor = "viagra-test-123";
 
     /**
+     * Last query sent to akismet (debugging)
+     */
+    private $last_request;
+
+    /**
+     * Last response from akismet (debugging)
+     */
+    private $last_response;
+
+    /**
      * Constructor checks if cURL extension exists and sets API url
      *
      * @throws Exception
@@ -173,6 +183,9 @@ class Test implements ConnectorInterface
      */
     private function query(array $comment, $path = self::PATH_CHECK, $expect = self::RETURN_TRUE)
     {
+        $this->last_request = implode("\n", array($comment, $path));
+        $this->last_response = $expect;
+
         $this->error = null;
 
         // Always return true
@@ -201,5 +214,25 @@ class Test implements ConnectorInterface
     public function getError()
     {
         return $this->error;
+    }
+
+    /**
+     * Debugging - Gets last request as a string
+     *
+     * @return string
+     */
+    public function getLastRequest()
+    {
+        return $this->last_request;
+    }
+
+    /**
+     * Debugging - Gets last response as a string
+     *
+     * @return string
+     */
+    public function getLastResponse()
+    {
+        return $this->last_response;
     }
 }

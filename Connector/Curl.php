@@ -53,6 +53,16 @@ class Curl implements ConnectorInterface
     private $error;
 
     /**
+     * Last query sent to akismet (debugging)
+     */
+    private $last_request;
+
+    /**
+     * Last response from akismet (debugging)
+     */
+    private $last_response;
+
+    /**
      * Constructor checks if cURL extension exists and sets API url
      *
      * @throws Exception
@@ -195,13 +205,18 @@ class Curl implements ConnectorInterface
             CURLOPT_HEADER => true
         );
 
+        $this->last_request = implode("\n", $settings);
+        $this->last_response = '';
+
         curl_setopt_array($conn, $settings);
         $response = explode("\n", curl_exec($conn));
 
         if (curl_errno($conn)) {
             $this->error = curl_error($curl);
+            $this->last_response = $this->error;
             return false;
         }
+        $this->last_response = implode("\n", $response);
 
         if (trim(end($response)) == $expect) {
             return true;
@@ -237,5 +252,25 @@ class Curl implements ConnectorInterface
     public function getError()
     {
         return $this->error;
+    }
+
+    /**
+     * Debugging - Gets last request as a string
+     *
+     * @return string
+     */
+    public function getLastRequest()
+    {
+        return $this->last_request;
+    }
+
+    /**
+     * Debugging - Gets last response as a string
+     *
+     * @return string
+     */
+    public function getLastResponse()
+    {
+        return $this->last_response;
     }
 }
