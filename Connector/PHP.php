@@ -58,6 +58,16 @@ class PHP implements ConnectorInterface
     private $error;
 
     /**
+     * Last query sent to akismet (debugging)
+     */
+    private $last_request;
+
+    /**
+     * Last response from akismet (debugging)
+     */
+    private $last_response;
+
+    /**
      * Constructor checks if cURL extension exists and sets API url
      */
     public function __construct()
@@ -197,12 +207,15 @@ class PHP implements ConnectorInterface
             $request
         );
 
+        $this->last_request = implode("\n", $headers);
+        $this->last_response = '';
         $headersWrite = implode("\r\n", $headers);
 
         $conn = fsockopen($this->apiHost, 80, $errno, $errstr, 10);
 
         if ($conn === false) {
             $this->error = sprintf('Socket error %s: %s', $errno, $errstr);
+            $this->last_response = $this->error;
             return false;
         } else {
             $response = '';
@@ -216,6 +229,7 @@ class PHP implements ConnectorInterface
         }
 
         if (strlen($response) > 0) {
+            $this->last_response = $response;
             $response = explode("\r\n\r\n", $response, 2);
             if (trim(end($response)) == $expect) {
                 return true;
@@ -231,6 +245,7 @@ class PHP implements ConnectorInterface
 
         } else {
             $this->error = 'Unknown error';
+            $this->last_response = $this->error;
             return false;
         }
     }
@@ -257,5 +272,25 @@ class PHP implements ConnectorInterface
     public function getError()
     {
         return $this->error;
+    }
+
+    /**
+     * Debugging - Gets last request as a string
+     *
+     * @return string
+     */
+    public function getLastRequest()
+    {
+        return $this->last_request;
+    }
+
+    /**
+     * Debugging - Gets last response as a string
+     *
+     * @return string
+     */
+    public function getLastResponse()
+    {
+        return $this->last_response;
     }
 }
