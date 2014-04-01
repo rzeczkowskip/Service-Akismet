@@ -63,16 +63,6 @@ interface ConnectorInterface
     const PATH_HAM = 'submit-ham';
 
     /**
-     * Last query sent to akismet (debugging)
-     */
-    private $last_request;
-
-    /**
-     * Last response from akismet (debugging)
-     */
-    private $last_response;
-
-    /**
      * Checks if Akismet API key is valid
      *
      * @param string $apiKey Akismet API key
