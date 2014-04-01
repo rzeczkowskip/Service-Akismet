@@ -137,4 +137,14 @@ class Akismet
     {
         return $this->connection->getError();
     }
+
+    /**
+     * Get connector instance
+     *
+     * @return ConnectorInterface
+     */
+    public function getConnector()
+    {
+        return $this->connection;
+    }
 }
