@@ -183,7 +183,7 @@ class Test implements ConnectorInterface
      */
     private function query(array $comment, $path = self::PATH_CHECK, $expect = self::RETURN_TRUE)
     {
-        $this->last_request = implode("\n", array($comment, $path));
+        $this->last_request = implode("\n", $comment);
         $this->last_response = $expect;
 
         $this->error = null;
