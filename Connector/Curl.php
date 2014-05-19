@@ -212,7 +212,7 @@ class Curl implements ConnectorInterface
         $response = explode("\n", curl_exec($conn));
 
         if (curl_errno($conn)) {
-            $this->error = curl_error($curl);
+            $this->error = curl_error($conn);
             $this->last_response = $this->error;
             return false;
         }
