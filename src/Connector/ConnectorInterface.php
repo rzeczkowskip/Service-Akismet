@@ -1,8 +1,8 @@
 <?php
 /**
- * rzeka.net
+ * RivCode
  *
- * @link http://www.github.com/rzekanet
+ * @link http://www.github.com/RivCode/Service-Akismet
  *
  * For the copyright and license information please view the LICENSE file
  */

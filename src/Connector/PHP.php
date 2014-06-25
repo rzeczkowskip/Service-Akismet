@@ -1,20 +1,27 @@
 <?php
 /**
- * rzeka.net
+ * RivCode
  *
- * @link http://www.github.com/rzekanet
+ * @link http://www.github.com/RivCode/Service-Akismet
  *
  * For the copyright and license information please view the LICENSE file
  */
 namespace Riv\Service\Akismet\Connector;
 
 /**
- * Test connector
+ * PHP connector
  *
- * Allows to test Akismet API without sending query to real API
+ * Connector that uses PHP sockets to connect to Akismet API
  */
-class Test implements ConnectorInterface
+class PHP implements ConnectorInterface
 {
+    /**
+     * Holds API host
+     *
+     * @var string
+     */
+    private $apiHost;
+
     /**
      * Holds API key
      *
@@ -51,13 +58,6 @@ class Test implements ConnectorInterface
     private $error;
 
     /**
-     * Comment author that should always be flagged as spam
-     *
-     * @var string
-     */
-    private $spamAuthor = "viagra-test-123";
-
-    /**
      * Last query sent to akismet (debugging)
      */
     private $last_request;
@@ -69,12 +69,11 @@ class Test implements ConnectorInterface
 
     /**
      * Constructor checks if cURL extension exists and sets API url
-     *
-     * @throws Exception
      */
     public function __construct()
     {
-        $this->apiUrl = sprintf('http://%s/%s/', self::AKISMET_URL, self::AKISMET_API_VERSION);
+        $this->apiHost = self::AKISMET_URL;
+        $this->apiUrl = sprintf('/%s/', self::AKISMET_API_VERSION);
     }
 
     /**
@@ -99,7 +98,8 @@ class Test implements ConnectorInterface
         if ($check === true) {
             $this->apiKey = $apiKey;
             $this->url = $url;
-            $this->apiUrl = sprintf('http://%s.%s/%s/', $this->apiKey, self::AKISMET_URL, self::AKISMET_API_VERSION);
+            $this->apiUrl = sprintf('/%s/', self::AKISMET_API_VERSION);
+            $this->apiHost = sprintf('%s.%s', $this->apiKey, self::AKISMET_URL);
             return true;
         } else {
             return false;
@@ -117,7 +117,7 @@ class Test implements ConnectorInterface
      *      comment_author_url - URL submitted with comment<br />
      *      comment_content - the content that was submitted
      *
-     * @return boolean True if message has been marked as ham
+     * @return boolean True if messahe has been marked as ham
      */
     public function sendHam(array $comment)
     {
@@ -157,13 +157,7 @@ class Test implements ConnectorInterface
      */
     public function check(array $comment)
     {
-        // If spam on purpose return true
-        if ($comment['comment_author'] == $this->spamAuthor) {
-            return true;
-        }
-
-        // Otherwise it is never spam
-        return false;
+        return $this->query($comment, self::PATH_CHECK, self::RETURN_TRUE);
     }
 
     /**
@@ -183,13 +177,77 @@ class Test implements ConnectorInterface
      */
     private function query(array $comment, $path = self::PATH_CHECK, $expect = self::RETURN_TRUE)
     {
-        $this->last_request = implode("\n", $comment);
-        $this->last_response = $expect;
-
         $this->error = null;
 
-        // Always return true
-        return true;
+        if ($path !== self::PATH_KEY) {
+            $comment['blog'] = $this->url;
+            if (!array_key_exists('user_ip', $comment)) { //set the user ip if not sent
+                $comment['user_ip'] = $_SERVER['REMOTE_ADDR'];
+            }
+
+            if (!array_key_exists('user_agent', $comment)) { //set the ua string if not sent
+                $comment['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+            }
+
+            if (!array_key_exists('referrer', $comment)) { //set the referer if not set
+                $comment['referrer'] = $_SERVER['HTTP_REFERER'];
+            }
+        }
+
+        $request = http_build_query($comment);
+        $requestLength = strlen($request);
+
+        $headers = array(
+            sprintf('POST %s%s HTTP/1.0', $this->apiUrl, $path),
+            sprintf('Host: %s', $this->apiHost),
+            'Content-Type: application/x-www-form-urlencoded',
+            sprintf('Content-Length: %s', $requestLength),
+            sprintf('User-Agent: %s', $this->userAgent),
+            '', //we need an empty line in here
+            $request
+        );
+
+        $this->last_request = implode("\n", $headers);
+        $this->last_response = '';
+        $headersWrite = implode("\r\n", $headers);
+
+        $conn = fsockopen($this->apiHost, 80, $errno, $errstr, 10);
+
+        if ($conn === false) {
+            $this->error = sprintf('Socket error %s: %s', $errno, $errstr);
+            $this->last_response = $this->error;
+            return false;
+        } else {
+            $response = '';
+            fwrite($conn, $headersWrite);
+
+            while (!feof($conn)) {
+                $response .= fgets($conn, 1160);
+            }
+
+            fclose($conn);
+        }
+
+        if (strlen($response) > 0) {
+            $this->last_response = $response;
+            $response = explode("\r\n\r\n", $response, 2);
+            if (trim(end($response)) == $expect) {
+                return true;
+            } else {
+                $debug = explode("\n", $response[0]);
+                foreach ($debug as $header) {
+                    if (stripos($header, 'X-akismet-debug-help') === 0) {
+                        $this->error = trim($header);
+                    }
+                }
+                return false;
+            }
+
+        } else {
+            $this->error = 'Unknown error';
+            $this->last_response = $this->error;
+            return false;
+        }
     }
 
     /**

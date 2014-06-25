@@ -1,8 +1,8 @@
 <?php
 /**
- * rzeka.net
+ * RivCode
  *
- * @link http://www.github.com/rzekanet
+ * @link http://www.github.com/RivCode/Service-Akismet
  *
  * For the copyright and license information please view the LICENSE file
  */
@@ -26,7 +26,7 @@ class Akismet
     /**
      * User agent string
      */
-    const UA_STRING = 'rzeka.net';
+    const UA_STRING = 'RivCode';
 
     /**
      * User agent version
@@ -36,14 +36,14 @@ class Akismet
     /**
      * Holds connector interface
      *
-     * @var \Rzeka\Web\Akismet\Connector\ConnectorInterface
+     * @var \Riv\Service\Akismet\Connector\ConnectorInterface
      */
     private $connection = null;
 
     /**
      * Class constructor sets up connector
      *
-     * @param Rzeka\Web\Akismet\Connector\ConnectorInterface $connection Connection instance
+     * @param \Riv\Service\Akismet\Connector\ConnectorInterface $connection Connection instance
      */
     public function __construct(Connector\ConnectorInterface $connection = null)
     {

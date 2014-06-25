@@ -1,27 +1,22 @@
 <?php
 /**
- * rzeka.net
+ * RivCode
  *
- * @link http://www.github.com/rzekanet
+ * @link http://www.github.com/RivCode/Service-Akismet
  *
  * For the copyright and license information please view the LICENSE file
  */
 namespace Riv\Service\Akismet\Connector;
 
-/**
- * PHP connector
- *
- * Connector that uses PHP sockets to connect to Akismet API
- */
-class PHP implements ConnectorInterface
-{
-    /**
-     * Holds API host
-     *
-     * @var string
-     */
-    private $apiHost;
+use \Exception;
 
+/**
+ * cURL connector
+ *
+ * Connector that uses cURL extension to connect to Akismet API
+ */
+class Curl implements ConnectorInterface
+{
     /**
      * Holds API key
      *
@@ -69,11 +64,16 @@ class PHP implements ConnectorInterface
 
     /**
      * Constructor checks if cURL extension exists and sets API url
+     *
+     * @throws Exception
      */
     public function __construct()
     {
-        $this->apiHost = self::AKISMET_URL;
-        $this->apiUrl = sprintf('/%s/', self::AKISMET_API_VERSION);
+        if (!function_exists('curl_init')) {
+            throw new Exception('Akismet cURL connector requires cURL extension');
+        }
+
+        $this->apiUrl = sprintf('http://%s/%s/', self::AKISMET_URL, self::AKISMET_API_VERSION);
     }
 
     /**
@@ -98,8 +98,7 @@ class PHP implements ConnectorInterface
         if ($check === true) {
             $this->apiKey = $apiKey;
             $this->url = $url;
-            $this->apiUrl = sprintf('/%s/', self::AKISMET_API_VERSION);
-            $this->apiHost = sprintf('%s.%s', $this->apiKey, self::AKISMET_URL);
+            $this->apiUrl = sprintf('http://%s.%s/%s/', $this->apiKey, self::AKISMET_URL, self::AKISMET_API_VERSION);
             return true;
         } else {
             return false;
@@ -179,6 +178,8 @@ class PHP implements ConnectorInterface
     {
         $this->error = null;
 
+        $conn = curl_init();
+
         if ($path !== self::PATH_KEY) {
             $comment['blog'] = $this->url;
             if (!array_key_exists('user_ip', $comment)) { //set the user ip if not sent
@@ -194,58 +195,37 @@ class PHP implements ConnectorInterface
             }
         }
 
-        $request = http_build_query($comment);
-        $requestLength = strlen($request);
-
-        $headers = array(
-            sprintf('POST %s%s HTTP/1.0', $this->apiUrl, $path),
-            sprintf('Host: %s', $this->apiHost),
-            'Content-Type: application/x-www-form-urlencoded',
-            sprintf('Content-Length: %s', $requestLength),
-            sprintf('User-Agent: %s', $this->userAgent),
-            '', //we need an empty line in here
-            $request
+        $settings = array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_URL => sprintf('%s%s', $this->apiUrl, $path),
+            CURLOPT_USERAGENT => $this->userAgent,
+            CURLOPT_POST => true,
+            CURLOPT_FAILONERROR => true,
+            CURLOPT_POSTFIELDS => http_build_query($comment),
+            CURLOPT_HEADER => true
         );
 
-        $this->last_request = implode("\n", $headers);
+        $this->last_request = implode("\n", $settings);
         $this->last_response = '';
-        $headersWrite = implode("\r\n", $headers);
 
-        $conn = fsockopen($this->apiHost, 80, $errno, $errstr, 10);
+        curl_setopt_array($conn, $settings);
+        $response = explode("\n", curl_exec($conn));
 
-        if ($conn === false) {
-            $this->error = sprintf('Socket error %s: %s', $errno, $errstr);
+        if (curl_errno($conn)) {
+            $this->error = curl_error($conn);
             $this->last_response = $this->error;
             return false;
-        } else {
-            $response = '';
-            fwrite($conn, $headersWrite);
-
-            while (!feof($conn)) {
-                $response .= fgets($conn, 1160);
-            }
-
-            fclose($conn);
         }
+        $this->last_response = implode("\n", $response);
 
-        if (strlen($response) > 0) {
-            $this->last_response = $response;
-            $response = explode("\r\n\r\n", $response, 2);
-            if (trim(end($response)) == $expect) {
-                return true;
-            } else {
-                $debug = explode("\n", $response[0]);
-                foreach ($debug as $header) {
-                    if (stripos($header, 'X-akismet-debug-help') === 0) {
-                        $this->error = trim($header);
-                    }
-                }
-                return false;
-            }
-
+        if (trim(end($response)) == $expect) {
+            return true;
         } else {
-            $this->error = 'Unknown error';
-            $this->last_response = $this->error;
+            foreach ($response as $header) {
+                if (stripos($header, 'X-akismet-debug-help') === 0) {
+                    $this->error = trim($header);
+                }
+            }
             return false;
         }
     }

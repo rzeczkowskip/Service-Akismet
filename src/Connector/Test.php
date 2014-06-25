@@ -1,21 +1,19 @@
 <?php
 /**
- * rzeka.net
+ * RivCode
  *
- * @link http://www.github.com/rzekanet
+ * @link http://www.github.com/RivCode/Service-Akismet
  *
  * For the copyright and license information please view the LICENSE file
  */
 namespace Riv\Service\Akismet\Connector;
 
-use \Exception;
-
 /**
- * cURL connector
+ * Test connector
  *
- * Connector that uses cURL extension to connect to Akismet API
+ * Allows to test Akismet API without sending query to real API
  */
-class Curl implements ConnectorInterface
+class Test implements ConnectorInterface
 {
     /**
      * Holds API key
@@ -53,6 +51,13 @@ class Curl implements ConnectorInterface
     private $error;
 
     /**
+     * Comment author that should always be flagged as spam
+     *
+     * @var string
+     */
+    private $spamAuthor = "viagra-test-123";
+
+    /**
      * Last query sent to akismet (debugging)
      */
     private $last_request;
@@ -69,10 +74,6 @@ class Curl implements ConnectorInterface
      */
     public function __construct()
     {
-        if (!function_exists('curl_init')) {
-            throw new Exception('Akismet cURL connector requires cURL extension');
-        }
-
         $this->apiUrl = sprintf('http://%s/%s/', self::AKISMET_URL, self::AKISMET_API_VERSION);
     }
 
@@ -116,7 +117,7 @@ class Curl implements ConnectorInterface
      *      comment_author_url - URL submitted with comment<br />
      *      comment_content - the content that was submitted
      *
-     * @return boolean True if messahe has been marked as ham
+     * @return boolean True if message has been marked as ham
      */
     public function sendHam(array $comment)
     {
@@ -156,7 +157,13 @@ class Curl implements ConnectorInterface
      */
     public function check(array $comment)
     {
-        return $this->query($comment, self::PATH_CHECK, self::RETURN_TRUE);
+        // If spam on purpose return true
+        if ($comment['comment_author'] == $this->spamAuthor) {
+            return true;
+        }
+
+        // Otherwise it is never spam
+        return false;
     }
 
     /**
@@ -176,58 +183,13 @@ class Curl implements ConnectorInterface
      */
     private function query(array $comment, $path = self::PATH_CHECK, $expect = self::RETURN_TRUE)
     {
+        $this->last_request = implode("\n", $comment);
+        $this->last_response = $expect;
+
         $this->error = null;
 
-        $conn = curl_init();
-
-        if ($path !== self::PATH_KEY) {
-            $comment['blog'] = $this->url;
-            if (!array_key_exists('user_ip', $comment)) { //set the user ip if not sent
-                $comment['user_ip'] = $_SERVER['REMOTE_ADDR'];
-            }
-
-            if (!array_key_exists('user_agent', $comment)) { //set the ua string if not sent
-                $comment['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
-            }
-
-            if (!array_key_exists('referrer', $comment)) { //set the referer if not set
-                $comment['referrer'] = $_SERVER['HTTP_REFERER'];
-            }
-        }
-
-        $settings = array(
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_URL => sprintf('%s%s', $this->apiUrl, $path),
-            CURLOPT_USERAGENT => $this->userAgent,
-            CURLOPT_POST => true,
-            CURLOPT_FAILONERROR => true,
-            CURLOPT_POSTFIELDS => http_build_query($comment),
-            CURLOPT_HEADER => true
-        );
-
-        $this->last_request = implode("\n", $settings);
-        $this->last_response = '';
-
-        curl_setopt_array($conn, $settings);
-        $response = explode("\n", curl_exec($conn));
-
-        if (curl_errno($conn)) {
-            $this->error = curl_error($conn);
-            $this->last_response = $this->error;
-            return false;
-        }
-        $this->last_response = implode("\n", $response);
-
-        if (trim(end($response)) == $expect) {
-            return true;
-        } else {
-            foreach ($response as $header) {
-                if (stripos($header, 'X-akismet-debug-help') === 0) {
-                    $this->error = trim($header);
-                }
-            }
-            return false;
-        }
+        // Always return true
+        return true;
     }
 
     /**
